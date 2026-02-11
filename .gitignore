@@ -1,0 +1,26 @@
+# MATLAB
+*.asv
+*.m~
+*.mex*
+*.mlappinstall
+*.mltbx
+slprj/
+codegen/
+
+# Data (large files)
+*.csv
+*.xlsx
+*.xls
+*.mat
+
+# Output
+Output/*
+!Output/.gitkeep
+
+# OS
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+*.swp
