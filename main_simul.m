@@ -3,7 +3,7 @@
 % Simulate data from a Bilinear TVP-VAR(1) model
 %
 % Model (non-centered parameterization):
-%   y_t = Phi_bar * x_{t-1} + Phi_tilde_t * x_{t-1} + eps_t
+%   y_t = Phi_bar * y_{t-1} + Phi_tilde_t * y_{t-1} + eps_t
 %
 % Bilinear decomposition:
 %   Phi_tilde_t = A_t * B * C_t
@@ -17,12 +17,20 @@ close all;
 
 rng(2026);
 
+addpath(genpath(pwd));
+
 %% ----- Settings ---------------------------------------------------------
 
 N = 3;    
-T = 400;  
+T = 500;  
+P = 1; 
 
 b = 0.05;  % elemenst of the B matrix (same for all)
+
+% MCMC
+Burn = 2e3;
+MCMC = 1e4;
+Thin = 1;
 
 %% ----- Static VAR coefficients (Phi_bar) --------------------------------
 
@@ -38,9 +46,9 @@ end
 
 %% ----- Static error covariance matrix (Sigma) ---------------------------
 
-Sigma = [ 1.0   0.6  0.4;
-          0.6   1.0  0.5;
-         0.4    0.5   1.0];
+Sigma = [ 1   .6  .4;
+          .6   1  .5;
+          .4  .5  1.0];
 try
     Sigma_chol = chol(Sigma, 'lower');
 catch
@@ -109,6 +117,14 @@ end
 
 %% ----- Plots ------------------------------------------------------------
 
-plot_simul;
+% plot_simul;
+
+%% ----- Estimate ---------------------------------------------------------
+
+
+% Minnesota prior: [constant, own lag, cross lag, contemporaneous, lag decay]
+lambda = [10^2, .2^2, .1^2, .2^2, 2];
+
+results = MCMC_bilinear_TVP_VAR1_simul(Y, lambda, Burn, MCMC, Thin);
 
 
