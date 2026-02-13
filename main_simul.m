@@ -19,9 +19,10 @@ rng(2026);
 
 %% ----- Settings ---------------------------------------------------------
 
-N = 3;              % number of endogenous variables
-T = 400;            % number of observations (after burn-in)
-b = 0.05;           % individual variance for B matrix (scalar, same for all)
+N = 3;    
+T = 400;  
+
+b = 0.05;  % elemenst of the B matrix (same for all)
 
 %% ----- Static VAR coefficients (Phi_bar) --------------------------------
 
@@ -45,10 +46,6 @@ try
 catch
     error('Sigma is not positive definite.');
 end
-
-%% ----- Bilinear decomposition parameters --------------------------------
-
-B = b * ones(N, N);
 
 %% ----- Deterministic sine paths for a(t) and c(t) -----------------------
 
@@ -77,8 +74,10 @@ c(:,[1,3]) = -c(:,[1,3]);
 % Phi_tilde_t = diag(a_t) * B * diag(c_t)
 % Phi_t = Phi_bar + Phi_tilde_t
 
+B         = b * ones(N, N);
 Phi_tilde = zeros(N, N, T);
 Phi_tv    = zeros(N, N, T);
+
 max_eigt  = zeros(T, 1);
 Y         = zeros(N, T);
 
