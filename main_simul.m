@@ -117,7 +117,7 @@ end
 
 %% ----- Plots ------------------------------------------------------------
 
-% plot_simul;
+plot_simul;
 
 %% ----- Estimate ---------------------------------------------------------
 
@@ -125,6 +125,6 @@ end
 % Minnesota prior: [constant, own lag, cross lag, contemporaneous, lag decay]
 lambda = [10^2, .2^2, .1^2, .2^2, 2];
 
-results = MCMC_bilinear_TVP_VAR1_simul(Y, lambda, Burn, MCMC, Thin);
+% results = MCMC_bilinear_TVP_VAR1_simul(Y, lambda, Burn, MCMC, Thin);
 
 
