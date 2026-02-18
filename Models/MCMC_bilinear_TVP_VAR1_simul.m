@@ -1,4 +1,4 @@
-function results = MCMC_bilinear_TVP_VAR1_simul(Data, lambda, gamma, init, Burn, MCMC, Thin)
+function [Phi_bar_draws, B_draws, a_draws, c_draws, sigma2_draws] = MCMC_bilinear_TVP_VAR1_simul(data, lambda, gamma, par_aux, init, burn, mcmc, thin, print)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Gibbs sampler for Bilinear TVP-VAR(1) %%%
@@ -23,35 +23,34 @@ function results = MCMC_bilinear_TVP_VAR1_simul(Data, lambda, gamma, init, Burn,
 
 %% dimensions %%
 
-[T, N] = size(Data);
+[T, N] = size(data);
 
 Teff = T - 1;
-K    = N^2;
 
 %% prior section %%
 
 %%% mean, static coefficients %%%
 
-% bar_phi ~ N(0,V_phi), bar_Phi = vec(bar_Phi')
-V_phi  = lambda(1) * ones(N,N);
-iV_phi = 1 ./ V_phi;
+% bar_phi ~ N(0, lambda(1)*I)
+iV_phi_diag = (1/lambda(1)) * eye(N);
 
-% vec(B') ~ N(0, lambda(2)*I_K)
-
-V_B  = lambda(2) * ones(N,N);
-iV_B = 1 ./ V_B;
+% vec(B') ~ N(0, lambda(2)*I)
+iV_B_diag = (1/lambda(2)) * eye(N);
 
 %%% mean, dynamic coefficients %%%
 
-% a(t) - a(t-1) ~ N(0, I_N), a(1) = 0 fixed
-% H_a * a(2:T) ~ N(0, I_{N(T-1)})
+ar1_aux    = par_aux(:,1);
+sigma2_aux = par_aux(:,2);
 
-H_a  = speye(N*Teff) - [[sparse(N,N*(Teff-1)); speye(N*(Teff-1))] sparse(N*Teff,N)];
+% lag matrix: L * x stacks x_{t-1} with x_1 = 0
+L = [sparse(N, N*Teff); speye(N*(Teff-1)) sparse(N*(Teff-1), N)];
 
-% c(t) - c(t-1) ~ N(0, I_N), c(1) = 0 fixed
-% H_c * c(2:T) ~ N(0, I_{N(T-1)})
+% a(t): (I - rho_a * L) a = eps_a,  eps_a ~ N(0, sigma2_a * I)
+%   rho_a = 1 => RW,  rho_a < 1 => AR(1)
+H_a  = speye(N*Teff) - ar1_aux(1) * L;
 
-H_c  = speye(N*Teff) - [[sparse(N,N*(Teff-1)); speye(N*(Teff-1))] sparse(N*Teff,N)];
+% c(t): (I - rho_c * L) c = eps_c,  eps_c ~ N(0, sigma2_c * I)
+H_c  = speye(N*Teff) - ar1_aux(2) * L;
 
 %%% variances %%%
 
@@ -63,124 +62,123 @@ b_e = (a_e - 1) * gamma(2);
 
 %% define objects %%
 
-Y = Data(2:end,:);
-X = Data(1:end-1,:);
+Y = data(2:end,:);
+X = data(1:end-1,:);
 
 %% initialization %%
 
 % initialize from true paramaters for simplicity
 
-
-Phi_bar = init.Phi_bar;              % N x N
-B       = init.B;                    % N x N
-A       = init.a;                    % T x N
-C       = init.c;                    % T x N
-sigma2  = init.sigma2;
+Phi_bar = init.Phi_bar; % N x N
+B       = init.B;       % N x N
+A       = init.a;       % T x N
+C       = init.c;       % T x N
+sigma2  = init.sigma2;  % N x 1
 
 %% storing %%
 
-Phi_bar_draws = zeros(MCMC, N, N);
-B_draws       = zeros(MCMC, N, N);
-A_draws       = zeros(MCMC, T, N);
-C_draws       = zeros(MCMC, T, N);
-sigma2_draws  = zeros(MCMC, N);
+Phi_bar_draws = zeros(mcmc, N, N);
+B_draws       = zeros(mcmc, N, N);
+a_draws       = zeros(mcmc, T, N);
+c_draws       = zeros(mcmc, T, N);
+sigma2_draws  = zeros(mcmc, N);
 
-%% useful %%
+%% precompute %%
 
-XX = X'*X;
+XX      = X'*X;
+HH_a    = (1/sigma2_aux(1)) * (H_a' * H_a);
+HH_c    = (1/sigma2_aux(2)) * (H_c' * H_c);
+D_x     = spdiags(vec(X'), 0, N*Teff, N*Teff);   % Block 4: X is fixed
+I_Teff  = speye(Teff);                           % Block 4: kron base
+a_post  = a_e + Teff / 2;                        % Block 5: IG shape
+isigma2 = 1 ./ sigma2;
 
-HH_a = H_a' * H_a;
+Y_tilde = zeros(Teff, N);
+E       = zeros(Teff, N);
 
-Phi_tilde = zeros(T, N, N);
-Y_tilde   = zeros(T-1, N);
+%% ---- Gibbs sampler --------------------------------------------------------
 
-%% Gibbs sampler %%
+niter = burn + mcmc * thin;
 
-Niter = Burn + MCMC * Thin;
-for iter = 1:Niter
+s = 1;
+tic;
+for iter = 1:niter
 
 
     %% block 1: Phi_bar %%
 
-    for t = 1:T-1
-
-        Y_tilde(t,:) = Y(t,:) - X(t,:) * (B .* (A(t+1,:)'*C(t+1,:)) )';
+    for t = 1:Teff
+        Y_tilde(t,:) = Y(t,:) - X(t,:) * (B .* (A(t+1,:)'*C(t+1,:)))';
     end
-    % vectorized alternative (faster for large N):
-    % CX = C(2:T,:) .* X;
-    % Y_tilde = Y - A(2:T,:) .* (CX * B');
 
     for i = 1:N
-
-        post_prec = diag(iV_phi(i,:)) + XX / sigma2(i);
+        post_prec = iV_phi_diag + XX / sigma2(i);
         post_rhs  = X' * Y_tilde(:,i) / sigma2(i);
-
         Phi_bar(i,:) = draw_precision(post_rhs, post_prec)';
     end
 
+    Y_bar      = Y - X * Phi_bar';
+    vec_Y_bar  = vec(Y_bar');
+
     %% block 2: B %%
 
-    Y_bar = Y - X * Phi_bar';
-
     for i = 1:N
-
-        Xtilde_i = A(2:T,i) .* (C(2:T,:) .* X);
-
-        post_prec = diag(iV_B(i,:)) + (Xtilde_i' * Xtilde_i) / sigma2(i);
+        Xtilde_i  = A(2:T,i) .* (C(2:T,:) .* X);
+        post_prec = iV_B_diag + (Xtilde_i' * Xtilde_i) / sigma2(i);
         post_rhs  = Xtilde_i' * Y_bar(:,i) / sigma2(i);
-
         B(i,:) = draw_precision(post_rhs, post_prec)';
     end
 
     %% block 3: a(t) %%
 
-    Xtilde = (C(2:T,:) .* X) * B';       
+    Xtilde        = (C(2:T,:) .* X) * B';
+    sigma_inv_mat = repmat(isigma2, Teff, 1);
+    vec_Xtilde    = vec(Xtilde');
 
-    sigma_inv_mat = repmat(1./sigma2, T-1, 1);
+    post_prec = HH_a + spdiags(vec_Xtilde.^2 .* sigma_inv_mat, 0, N*Teff, N*Teff);
+    post_rhs  = vec_Xtilde .* vec_Y_bar .* sigma_inv_mat;
 
-    temp = vec(Xtilde').^2 .* sigma_inv_mat;
-
-    post_prec = HH_a + spdiags(temp, 0, N*Teff, N*Teff);
-    post_rhs  = vec(Xtilde') .* vec(Y_bar') .* sigma_inv_mat;
-
-    vec_A   = draw_precision(post_rhs, post_prec);
-    A(2:T,:) = reshape(vec_A, N, T-1)';
+    A(2:T,:) = reshape(draw_precision(post_rhs, post_prec), N, Teff)';
 
     %% block 4: c(t) %%
 
-    %% block 5: sigma2(i) %%
+    Xtilde = spdiags(vec(A(2:T,:)'), 0, N*Teff, N*Teff) ...
+           * kron(I_Teff, B) * D_x;
 
-    
+    S_inv     = spdiags(sigma_inv_mat, 0, N*Teff, N*Teff);
+    post_prec = HH_c + Xtilde' * S_inv * Xtilde;
+    post_rhs  = Xtilde' * (sigma_inv_mat .* vec_Y_bar);
+
+    C(2:T,:) = reshape(draw_precision(post_rhs, post_prec), N, Teff)';
+
+    %% block 5: sigma2 %%
+
+    for t = 1:Teff
+        E(t,:) = Y_bar(t,:) - X(t,:) * (B .* (A(t+1,:)' * C(t+1,:)))';
+    end
+
+    for i = 1:N
+        sigma2(i) = igamrnd(a_post, b_e + sum(E(:,i).^2) / 2);
+    end
+
+    isigma2 = 1 ./ sigma2;
 
     %% store %%
-    if iter > nburn
-        s = iter - nburn;
-        Phi_bar_draws(s,:) = vec(Phi_bar)';
-        b_draws(s)         = b;
-        Sigma_draws(s,:,:) = Sigma;
-        a_post_mean        = a_post_mean + a / nsave;
-        c_post_mean        = c_post_mean + c / nsave;
+    if iter > burn && mod(iter - burn, thin) == 0
+
+        Phi_bar_draws(s,:,:) = Phi_bar;
+        B_draws(s,:,:)       = B;
+        a_draws(s,:,:)       = A;
+        c_draws(s,:,:)       = C;
+        sigma2_draws(s,:)    = sigma2';
+
+        s = s+1;
     end
 
-    if mod(iter, 1000) == 0
-        fprintf('MCMC iteration %d / %d\n', iter, ntot);
+    if mod(iter, print) == 0
+        fprintf('Iteration %d / %d\n', iter, niter);
     end
 end
+fprintf('Elapsed time: %.2f secs\n', toc);
 
-%% ---- Results --------------------------------------------------------------
-results.Phi_bar = Phi_bar_draws;
-results.b       = b_draws;
-results.Sigma   = Sigma_draws;
-results.a_mean  = a_post_mean;
-results.c_mean  = c_post_mean;
 
-end
-
-%% ---- Local helper ----------------------------------------------------------
-function val = get_opt(s, fld, default)
-    if isfield(s, fld)
-        val = s.(fld);
-    else
-        val = default;
-    end
-end
