@@ -1,4 +1,4 @@
-function [C_l, C_l_nolam, C_c, C_c_nolam] = construct_Minnesota(scales,P,lambda)
+function [M, C_l, C_c, ps_lam12] = construct_Minnesota(scales,P,lambda)
 
 % lambda(1): constant
 % lambda(2): lagged (own)
@@ -8,40 +8,55 @@ function [C_l, C_l_nolam, C_c, C_c_nolam] = construct_Minnesota(scales,P,lambda)
 
 N = length(scales);
 
-C_l       = zeros(N,N*P);
-C_l_nolam = zeros(N,N*P);
-for p = 1:P
+M = sparse(N,N*P+1);
 
-    s     = (p-1)*N;
-    decay = p^lambda(5);
-    for i = 1:N
+temp_l = zeros(N);
+C_c    = NaN(N,N-1);
+for i = 1:N
 
-        for j = 1:N
+    for j = 1:N
 
-            sc_ij = scales(i)/scales(j);
+        sc_ij = scales(i)/scales(j);
 
-            if i == j
+        if i == j
 
-                C_l(i,s+j) = sc_ij * lambda(2) / decay;
-            else
-                C_l(i,s+j) = sc_ij * lambda(3) / decay;
-            end
-            C_l_nolam(i,s+j) = sc_ij / decay;
+           temp_l(i,j) = sc_ij*lambda(2);
+        else
+           temp_l(i,j) = sc_ij*lambda(3);
+        end
+
+        if i > j
+
+           C_c(i,j) = lambda(4)*sc_ij;
         end
     end
 end
 
-C_c       = NaN(N,N);
-C_c_nolam = NaN(N);
-for i = 2:N
-    for j = 1:i-1
+C_c = C_c';
 
-        sc_ij = scales(i) / scales(j);
+C_l = zeros(N,N*P);
+for i = 1:P
 
-        C_c(i,j)       = lambda(4) * sc_ij;
-        C_c_nolam(i,j) = sc_ij;
-    end
+    C_l(:,(i-1)*N+1:i*N) = temp_l/(i^lambda(5));
 end
 
-C_l       = [lambda(1)*scales, C_l];
-C_l_nolam = [lambda(1)*scales, C_l_nolam];
+C_l = [lambda(1)*scales, C_l]';
+
+sq = 1:N^2*P+N;
+
+blk   = reshape(sq,N*P+1,N)';
+
+ps_l1 = zeros(N*P,1);
+for i = 1:P
+
+    ps   = (i-1)*N+1:i*N;
+    temp = blk(:,ps+1);
+
+    ps_l1(ps) = diag(temp);
+end
+
+ps_l1 = sort(ps_l1);
+ps_l2 = setdiff(vec(blk(:,2:end)'),ps_l1);
+
+ps_lam12{1} = ps_l1;
+ps_lam12{2} = ps_l2;

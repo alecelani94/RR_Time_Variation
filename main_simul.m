@@ -25,7 +25,7 @@ N = 3;
 T = 500;  
 P = 1; 
 
-b = 0.05;  % elemenst of the B matrix (same for all)
+b = 0.20;  % elemenst of the B matrix (same for all)
 
 % MCMC
 Burn = 2e3;
@@ -34,9 +34,9 @@ Thin = 1;
 
 %% ----- Static VAR coefficients (Phi_bar) --------------------------------
 
-Phi_bar = [ .70  -.34   .26;
-            .17   .61  -.42;
-           -.36   .10   .79];
+Phi_bar = [ .62  -.29   .23;
+            .15   .54  -.37;
+           -.31   .08   .70];
 
 max_eig = max(abs(eig(Phi_bar)));
 if max_eig > 1
@@ -46,9 +46,11 @@ end
 
 %% ----- Static error covariance matrix (Sigma) ---------------------------
 
-Sigma = [ 1   .6  .4;
-          .6   1  .5;
-          .4  .5  1.0];
+Sigma = eye(N);
+% Sigma = [ 1   .6  .4;
+%           .6   1  .5;
+%           .4  .5  1.0];
+
 try
     Sigma_chol = chol(Sigma, 'lower');
 catch
@@ -61,7 +63,7 @@ end
 % c_j(t) = amplitude * sin(2*pi*freq_c(j) * (t-1)/T)
 % All paths: initialized at 0, span [-0.99, 0.99], max 2 peaks.
 
-amplitude = 0.95;
+amplitude = 1;
 freq_a = [1.25; 1.0; 0.75];  % cycles per sample for a_1, a_2, a_3
 freq_c = [0.75; 1.0; 1.25];  % cycles per sample for c_1, c_2, c_3
 
@@ -117,14 +119,23 @@ end
 
 %% ----- Plots ------------------------------------------------------------
 
-plot_simul;
+% plot_simul;
 
 %% ----- Estimate ---------------------------------------------------------
 
+% prior variances mean coeffs
+lambda = [.4,    % static                   : Phi_bar(i,j)
+          .01];  % st. dev. dynamic decomp. : B(i,j) 
 
-% Minnesota prior: [constant, own lag, cross lag, contemporaneous, lag decay]
-lambda = [10^2, .2^2, .1^2, .2^2, 2];
+% IG prior individual variances
+gamma = [4,   % shape
+         1];  % mean
 
-% results = MCMC_bilinear_TVP_VAR1_simul(Y, lambda, Burn, MCMC, Thin);
+% wrap true parameters for initial conditions
+init.Phi_bar = Phi_bar;
+init.B       = B;
+init.a       = a;
+init.c       = c;
+init.sigma2  = diag(Sigma);
 
-
+results = MCMC_bilinear_TVP_VAR1_simul(Y, lambda, gamma, init, Burn, MCMC, Thin);
