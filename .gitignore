@@ -24,3 +24,12 @@ Thumbs.db
 # IDE
 .vscode/
 *.swp
+
+# Claude Code local overrides (may contain secrets)
+.claude/settings.local.json
+
+# Paper (lives in its own Overleaf git repo)
+Overleaf/
+
+# Windows reserved-name leftovers from shell redirects
+nul

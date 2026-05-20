@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pdflatex -interaction=nonstopmode tensor_notes5.tex)",
+      "Bash(pdftoppm -png -r 200 tensor_notes5.pdf tn5_page)",
+      "Bash(pdflatex -interaction=nonstopmode symbol_test.tex)",
+      "Bash(pdflatex -interaction=nonstopmode proof_stacked.tex)",
+      "Bash(pdflatex -interaction=nonstopmode proof_frontal.tex)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git rebase:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(git config:*)",
+      "Bash(pip install:*)",
+      "Bash(python verify.py --lines 366-410)",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe verify.py --section \"Multidimensional generalization\")",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe verify.py --lines 363-408)",
+      "Bash(ls /c/Users/aoci/AppData/Local/npm/claude*)",
+      "Bash(ls /c/Users/aoci/AppData/Roaming/npm/claude*)",
+      "Bash(pip show:*)",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe -c \"from mistralai import Mistral; print\\('ok'\\)\")",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe -c \"from mistralai.client import MistralClient; print\\('ok'\\)\")",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe -c \"import mistralai; print\\(dir\\(mistralai\\)\\)\")",
+      "Bash(git pull:*)",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe verify.py --lines 290-341)",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe /c/Users/aoci/Desktop/GitHub/Bilinear_TVP_VAR/verify.py --lines 290-341)",
+      "Read(//c/Users/aoci/Bilinear-TVP/**)",
+      "Read(//c/Users/aoci/moderate-tvp-var//**)",
+      "Read(//c/Users/aoci/Dropbox//**)",
+      "Bash(pdflatex -interaction=nonstopmode slides_orebro.tex)",
+      "Read(//c/Users/aoci/moderate-tvp-var/**)",
+      "Bash(grep -n \"\\\\\\\\\\\\\\\\begin{frame}\\\\|\\\\\\\\\\\\\\\\section\" /c/Users/aoci/moderate-tvp-var/slides_research_agenda.tex)",
+      "Bash(bibtex slides_orebro)",
+      "Bash(/c/Users/aoci/AppData/Local/Programs/Python/Python313/python.exe /c/Users/aoci/Desktop/GitHub/Bilinear_TVP_VAR/verify.py --file \"C:\\\\Users\\\\aoci\\\\Bilinear-TVP\\\\slides_orebro.tex\" --all)",
+      "Bash(grep -n \"^\\\\\\\\\\\\\\\\begin{frame}\" slides_orebro.tex)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\aoci\\Bilinear-TVP"
+    ]
+  }
+}
