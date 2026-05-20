@@ -83,6 +83,10 @@ priors.Sigma_S0 = (priors.Sigma_nu - N - 1) * priors.Sigma_AR;
 % --- Renormalized RW variance for a and b (symmetric, (RT)^(-1/2)) ---
 priors.v_ab = (R * T)^(-1/2);
 
+%% ---- precomputes (fixed across the Gibbs loop) ------------------------
+
+XX = X' * X;                            % K x K  (used in Block 1)
+
 %% ---- initialization ---------------------------------------------------
 
 % Static coefficients: unrestricted OLS on the VAR(P) system.
@@ -129,8 +133,38 @@ tic;
 for iter = 1:niter
 
     %% Block 1: static coefficients Psi_bar ----------------------------
-    % TODO: residualize on TV component, build the combined prior var
-    %       matrix [V_phi0, C_Psi .* lambda_mask], system-wise Gaussian draw.
+    % System-wise conjugate Gaussian draw of vec(Psi_bar) given the TV
+    % component and the hierarchical Minnesota prior.
+
+    % --- TV contribution to each y_t ---
+    % Phi_TV(t) = S_l_m .* (A_t B_t'), then row t of TV_part is Phi_TV(t) * x_t
+    TV_part = zeros(T, N);
+    for t = 1:T
+        A_t = reshape(A(t, :, :), N, R);
+        B_t = reshape(B(t, :, :), K, R);
+        TV_part(t, :) = ((S_l_m .* (A_t * B_t')) * X(t, :)')';
+    end
+    Y_bar_psi = Y - TV_part;                    % T x N residualized data
+
+    % --- Prior precision diagonal of vec(Psi_bar), NK x 1, in column-stack order ---
+    % First N entries: V_phi0 (intercept column, fixed by lambda_const).
+    % Remaining N*K_lag entries: C_Psi multiplied by lambda_own / lambda_cross.
+    V_lag_vec = priors.C_Psi(:);
+    V_lag_vec(priors.ps_own)   = lambda_own   * V_lag_vec(priors.ps_own);
+    V_lag_vec(priors.ps_cross) = lambda_cross * V_lag_vec(priors.ps_cross);
+    V_psi_diag = [priors.V_phi0; V_lag_vec];    % NK x 1
+
+    % --- Posterior precision and mean (X'X kron Sigma^{-1} + diag prior) ---
+    Sigma_inv = Sigma \ eye(N);
+    P_post    = spdiags(1 ./ V_psi_diag, 0, N*K, N*K) + kron(XX, Sigma_inv);
+    rhs       = Sigma_inv * (Y_bar_psi' * X);   % N x K
+    rhs       = rhs(:);                          % NK x 1
+
+    % --- Cholesky draw ---
+    L_post   = chol(P_post, 'lower');
+    mu_post  = L_post' \ (L_post \ rhs);
+    psi_draw = mu_post + L_post' \ randn(N*K, 1);
+    Psi_bar  = reshape(psi_draw, N, K);
 
     %% Block 2: lambda_own, lambda_cross (hierarchical Minnesota) ------
     if priors.lam_hier
@@ -148,19 +182,26 @@ for iter = 1:niter
     % TODO: Gaussian conjugate eq-by-eq given A, B and residuals.
 
     %% Block 6: Sigma  (inverse-Wishart, full matrix) ------------------
-    % TODO: E = residuals after Psi_bar and the TV component;
-    %       Sigma = iwishrnd(priors.Sigma_S0 + E'*E, priors.Sigma_nu + T);
+    % Recompute TV contribution with the latest A, B, S_l_m, then form
+    % the full residual E = Y - X*Psi_bar' - TV_part and draw Sigma.
+    for t = 1:T
+        A_t = reshape(A(t, :, :), N, R);
+        B_t = reshape(B(t, :, :), K, R);
+        TV_part(t, :) = ((S_l_m .* (A_t * B_t')) * X(t, :)')';
+    end
+    E_full = Y - X * Psi_bar' - TV_part;
+    Sigma  = iwishrnd(priors.Sigma_S0 + E_full' * E_full, priors.Sigma_nu + T);
 
     %% store -----------------------------------------------------------
     if iter > opts.burn && mod(iter - opts.burn, opts.thin) == 0
         s = s + 1;
-        draws.Psi_bar(s, :, :)      = Psi_bar;
-        draws.lambda_own(s)         = lambda_own;
-        draws.lambda_cross(s)       = lambda_cross;
-        draws.A(s, :, :, :)         = A;
-        draws.B(s, :, :, :)         = B;
-        draws.S_l_m(s, :, :)        = S_l_m;
-        draws.Sigma(s, :, :)        = Sigma;
+        draws.Psi_bar(s, :, :) = Psi_bar;
+        draws.lambda_own(s)    = lambda_own;
+        draws.lambda_cross(s)  = lambda_cross;
+        draws.A(s, :, :, :)    = A;
+        draws.B(s, :, :, :)    = B;
+        draws.S_l_m(s, :, :)   = S_l_m;
+        draws.Sigma(s, :, :)   = Sigma;
     end
 
     if mod(iter, opts.print_freq) == 0
