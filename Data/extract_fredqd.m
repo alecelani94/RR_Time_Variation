@@ -10,7 +10,7 @@ clc
 % saves one .mat per dataset. Set do_plot = true to also visualize them.
 % =========================================================================
 
-do_plot = false;   % set true to draw one figure per dataset
+do_plot = truea;   % set true to draw one figure per dataset
 
 %% ----- Load CSV (auto-pick latest, auto-detect delimiter) ---------------
 
@@ -97,6 +97,23 @@ small_5_vars = [small_4_vars; {
     'INDPRO',       'IPgrowth',         '4log'
 }];
 
+% --- ZLB-robust variants: GS5 (5y Treasury yield) replaces FedFunds ---
+% Following Carriero-Clark-Marcellino, the 5-year market yield carries
+% the same monetary-policy stance information without the FedFunds ZLB flatness.
+small_3_gs5_vars = {
+    'GDPC1',        'RGDP',             '4log'
+    'GDPCTPI',      'PGDP',             '4log'
+    'GS5',          'GS5',              'raw'
+};
+
+small_4_gs5_vars = [small_3_gs5_vars; {
+    'UNRATE',       'UnempRate',        'raw'
+}];
+
+small_5_gs5_vars = [small_4_gs5_vars; {
+    'INDPRO',       'IPgrowth',         '4log'
+}];
+
 medium_vars = {
     'GDPC1',        'RGDP',             '4log'
     'GDPCTPI',      'PGDP',             '4log'
@@ -137,8 +154,10 @@ large_vars = {
 %         Ynames{d} = 1 x n cell of variable name strings
 %         Ydates     = T-1 x 1 datetime vector (shared across datasets)
 
-datasets = {small_3_vars, small_4_vars, small_5_vars, medium_vars, large_vars};
-dsnames  = {'Small_3', 'Small_4', 'Small_5', 'Medium', 'Large'};
+datasets = {small_3_vars,     small_4_vars,     small_5_vars,     medium_vars, large_vars, ...
+            small_3_gs5_vars, small_4_gs5_vars, small_5_gs5_vars};
+dsnames  = {'Small_3',     'Small_4',     'Small_5',     'Medium', 'Large', ...
+            'Small_3_gs5', 'Small_4_gs5', 'Small_5_gs5'};
 nDS    = numel(datasets);
 Y      = cell(1, nDS);
 Ynames = cell(1, nDS);
@@ -179,8 +198,9 @@ Ydates = dates(2:end);
 
 %% ----- Save (three separate .mat files) ---------------------------------
 
-out_files = {'fredqd_small_3.mat', 'fredqd_small_4.mat', 'fredqd_small_5.mat', ...
-             'fredqd_medium.mat', 'fredqd_large.mat'};
+out_files = {'fredqd_small_3.mat',     'fredqd_small_4.mat',     'fredqd_small_5.mat',     ...
+             'fredqd_medium.mat',      'fredqd_large.mat',                                 ...
+             'fredqd_small_3_gs5.mat', 'fredqd_small_4_gs5.mat', 'fredqd_small_5_gs5.mat'};
 for d = 1:nDS
     out_path = fullfile(here, out_files{d});
     data   = Y{d};

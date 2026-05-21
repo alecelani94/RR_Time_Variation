@@ -1,9 +1,3 @@
-%% main.m
-% Driver for the Reduced Rank Time Variation paper.
-%
-% Choose dataset (small / medium / large), choose time span, optionally
-% plot. Estimation hooks will be wired in later as the sampler is built.
-
 clear; 
 clc; 
 close all;
@@ -15,7 +9,7 @@ addpath(genpath(fullfile(pwd, 'Models')));
 
 %% ----- General settings -------------------------------------------------
 
-dataset    = 'small_4';             % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
+dataset    = 'small_3';             % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
 
 date_start = datetime(1959, 6, 1);  % inclusive; first available 1959-Q2
 date_end   = datetime(2019, 12, 1); % inclusive; pre Covid
@@ -93,6 +87,7 @@ IFs_RR   = cell(R_max, 1);
 Phi_q_RR = cell(R_max, 1);
 
 for R = 1:R_max
+
     fprintf('\n=== RR bilinear TVP-VAR (R = %d / %d) ===\n', R, R_max);
     draws_r       = MCMC_RR_TVPVAR(Y, P, R, priors, opts);
     IFs_r         = compute_IFs(draws_r);

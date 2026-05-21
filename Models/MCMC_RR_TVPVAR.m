@@ -256,14 +256,28 @@ for iter = 1:niter
     % version had a latent bug for R >= 2.
     B      = permute(reshape(b_draw, R, K, T), [3 2 1]);  % T x K x R
 
-    %% Sign flip (Fruhwirth-Schnatter & Wagner 2010) -------------------
-    % Per rank component r, jointly flip (A(:,:,r), B(:,:,r)) w.p. 1/2;
-    % A_t B_t' is invariant so the posterior is preserved.
+    %% Sign flips -- three independent posterior-preserving moves ------
+    % The bilinear model has N+K+R independent sign symmetries; we apply
+    % one flip block for each to make S_l_m marginals symmetric (equal
+    % mass at +|S_l_m| and -|S_l_m|) and let the chain visit all
+    % 2^(N+K+R) equivalent sign basins.
+
+    % (a) Per-rank (Fruhwirth-Schnatter & Wagner 2010): flip (A_r, B_r).
     sgn_R = sign(rand(R, 1) - 0.5);
     for r = 1:R
         A(:, :, r) = sgn_R(r) * A(:, :, r);
         B(:, :, r) = sgn_R(r) * B(:, :, r);
     end
+
+    % (b) Per-equation: flip (S_l_m(i, :), A(:, i, :)) jointly w.p. 1/2.
+    sgn_N = sign(rand(N, 1) - 0.5);
+    S_l_m = sgn_N .* S_l_m;                          % flip row i of S_l_m
+    A     = A .* reshape(sgn_N, 1, N, 1);            % flip row i of A across t,r
+
+    % (c) Per-regressor: flip (S_l_m(:, k), B(:, k, :)) jointly w.p. 1/2.
+    sgn_K = sign(rand(K, 1) - 0.5);
+    S_l_m = S_l_m .* sgn_K(:)';                      % flip col k of S_l_m
+    B     = B .* reshape(sgn_K, 1, K, 1);            % flip row k of B across t,r
 
     %% Block 5: Sigma (inverse-Wishart, full matrix) -------------------
     % Recompute AB_3D with the latest (A, B); reuse y_bar_mat for residuals.
