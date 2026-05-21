@@ -1,34 +1,24 @@
-function draws = MCMC_RR_TVPVAR(Data, P, R, priors, opts)
-% MCMC_RR_TVPVAR   Gibbs sampler for the rank-R bilinear TVP-VAR(P).
+function draws = MCMC_RR_TVPVAR_v2(Data, P, R, priors, opts)
+% MCMC_RR_TVPVAR_v2  Gibbs sampler for the rank-R bilinear TVP-VAR(P) using
+% the b-block convention b_t = vec(B_t) (standard column-major), as in the
+% formulation suggested by Gemini.
 %
-% Model (non-centered, intercept folded in):
+% Algebraically equivalent to MCMC_RR_TVPVAR (v1): both samplers target the
+% same posterior over (Psi_bar, A_t, B_t, S_l_m, Sigma, lambdas) and should
+% produce identical posterior summaries (to MCMC error). The only
+% difference is the internal ordering of the b_t vector and the
+% corresponding column ordering of the Z_b design matrix:
 %
-%   y_t = X_t * phi_bar + X_t * S_l * vec(A_t * B_t') + eps_t,
-%   A_t = A_{t-1} + u^a_t,   u^a_t ~ N(0, v_ab * I_N),
-%   B_t = B_{t-1} + u^b_t,   u^b_t ~ N(0, v_ab * I_K),
-%   eps_t ~ N(0, Sigma),
+%     v1 (MCMC_RR_TVPVAR):  b_t := vec(B_t')  -- r innermost within (k, r)
+%                            ==> vec(A_t B_t') = (I_K kron A_t) b_t
+%     v2 (this file):       b_t := vec(B_t)   -- k innermost within (k, r)
+%                            ==> vec(A_t B_t') = (I_K kron A_t) K_{K,R} b_t
+%                                where K_{K,R} is the commutation matrix
+%                                (implemented here implicitly via column
+%                                permutation of Z_b -- no explicit K_{K,R}).
 %
-% where  X_t = x_t' kron I_N,  x_t = [1, y_{t-1}', ..., y_{t-P}']',
-%        K = N*P + 1,  M = N*K,
-%        A_t in R^{N x R},  B_t in R^{K x R},
-%        S_l = diag(vec(S_l_m)) with S_l_m an N x K loading matrix,
-%        v_ab = (R*T)^{-1/2}  (renormalized RW innovation variance).
-%
-% Sampler blocks (Gibbs, Chan 2023 JBES joint update + FS-Wagner sign flip):
-%   1. (phi_bar, S_l_m)          -- JOINT Gaussian conjugate (Chan 2023);
-%                                    same trick as MCMC_TVPVAR with
-%                                    tau_t := vec(A_t B_t') replacing theta_t.
-%   2. lambda_own, lambda_cross  -- hierarchical GIG (if priors.lam_hier).
-%   3. a                         -- banded precision (bandwidth NR).
-%   4. b                         -- banded precision (bandwidth KR).
-%   4.5 sign flip                -- jointly flip (A(:,:,r), B(:,:,r)) per rank
-%                                    component r with prob 1/2.
-%   5. Sigma                     -- inverse-Wishart (full matrix).
-%
-% Conditional-mean blocks (1, 3, 4) all sample Gaussians via banded or
-% block-tridiagonal Cholesky; the dominant cost is the (a, b) banded draws
-% with bandwidths NR and KR respectively, much smaller than the M=NK
-% bandwidth of the unrestricted MCMC_TVPVAR theta block (the point of RR).
+% Use this file as a sanity check for the v1 benchmark. At R = 1 the two
+% are bit-for-bit identical; for R >= 2 they should agree to MC error.
 
 %% ---- setup ------------------------------------------------------------
 
@@ -118,7 +108,7 @@ r_b      = mod(floor(idx_b / N),     R);
 k_b      = mod(floor(idx_b / (N*R)), K);
 t_b      = floor(idx_b / (N*R*K));
 ii_b_pre = t_b * N  + i_b + 1;
-jj_b_pre = t_b * KR + k_b * R + r_b + 1;
+jj_b_pre = t_b * KR + r_b * K + k_b + 1;   % v2: k innermost (matches vec(B_t))
 
 % --- Common (i, k, t) -> NT-stack / M-stack indices used by joint block ---
 idx_v    = (0:(N*K*T - 1))';
@@ -250,11 +240,9 @@ for iter = 1:niter
     P_b    = (1/priors.v_ab) * HtH_b + Z_b' * Sigma_inv_T * Z_b;
     rhs_b  = Z_b' * (Sigma_inv_T * y_bar_vec);
     b_draw = draw_precision(rhs_b, P_b);
-    % jj_b_pre orders (k, r) with r innermost (= vec(B_t')), so the
-    % matching column-major reshape is (R, K, T); then permute to (T, K, R).
-    % Equivalent to (K, R, T) + [3 1 2] only when R = 1 -- the previous
-    % version had a latent bug for R >= 2.
-    B      = permute(reshape(b_draw, R, K, T), [3 2 1]);  % T x K x R
+    % v2: jj_b_pre orders (k, r) with k innermost (= vec(B_t)), so the
+    % matching column-major reshape is (K, R, T); then permute to (T, K, R).
+    B      = permute(reshape(b_draw, K, R, T), [3 1 2]);  % T x K x R
 
     %% Sign flip (Fruhwirth-Schnatter & Wagner 2010) -------------------
     % Per rank component r, jointly flip (A(:,:,r), B(:,:,r)) w.p. 1/2;

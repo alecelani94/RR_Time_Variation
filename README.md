@@ -1,11 +1,11 @@
-# Bilinear TVP-VAR
+# RR Time Variation
 
-Bilinear Time-Varying Parameter Vector Autoregression.
+Reduced Rank Time Variation for Vector-Valued Models.
 
 ## Project Structure
 
 ```
-Bilinear_TVP_VAR/
+RR_Time_Variation/
 ├── Functions/      % Utility and helper functions
 ├── Models/         % Model estimation routines
 ├── Data/           % Input datasets
@@ -28,4 +28,3 @@ main
 ## References
 
 TBA
-C:\Users\aoci\Desktop\GitHub\Bilinear_TVP_VAR

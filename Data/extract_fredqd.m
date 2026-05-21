@@ -3,13 +3,14 @@ close all
 clc
 
 % =========================================================================
-% Extract GLP (2015) datasets from FRED-QD
-% Small (3), Medium (7), Large (23) BVAR variable sets
+% Extract FRED-QD datasets (Small_3 / Small_4 / Small_5 / Medium / Large)
 %
 % Reads the most recent *-QD.csv in this folder, applies GLP transformations
-% (400 * Delta log for growth series, raw for rates/utilization), and saves
-% to fredqd_glp.mat as three cell entries.
+% (400 * Delta log for growth series, raw for rates / utilization), and
+% saves one .mat per dataset. Set do_plot = true to also visualize them.
 % =========================================================================
+
+do_plot = false;   % set true to draw one figure per dataset
 
 %% ----- Load CSV (auto-pick latest, auto-detect delimiter) ---------------
 
@@ -82,11 +83,19 @@ end
 %   '4log' = 400 * Delta log(x_t)  (annualized quarterly log growth)
 %   'raw'  = no transformation (levels)
 
-small_vars = {
+small_3_vars = {
     'GDPC1',        'RGDP',             '4log'
     'GDPCTPI',      'PGDP',             '4log'
     'FEDFUNDS',     'FedFunds',         'raw'
 };
+
+small_4_vars = [small_3_vars; {
+    'UNRATE',       'UnempRate',        'raw'
+}];
+
+small_5_vars = [small_4_vars; {
+    'INDPRO',       'IPgrowth',         '4log'
+}];
 
 medium_vars = {
     'GDPC1',        'RGDP',             '4log'
@@ -128,12 +137,13 @@ large_vars = {
 %         Ynames{d} = 1 x n cell of variable name strings
 %         Ydates     = T-1 x 1 datetime vector (shared across datasets)
 
-datasets = {small_vars, medium_vars, large_vars};
-dsnames  = {'Small', 'Medium', 'Large'};
-Y      = cell(1, 3);
-Ynames = cell(1, 3);
+datasets = {small_3_vars, small_4_vars, small_5_vars, medium_vars, large_vars};
+dsnames  = {'Small_3', 'Small_4', 'Small_5', 'Medium', 'Large'};
+nDS    = numel(datasets);
+Y      = cell(1, nDS);
+Ynames = cell(1, nDS);
 
-for d = 1:3
+for d = 1:nDS
     vars = datasets{d};
     nv = size(vars, 1);
 
@@ -169,8 +179,9 @@ Ydates = dates(2:end);
 
 %% ----- Save (three separate .mat files) ---------------------------------
 
-out_files = {'fredqd_small.mat', 'fredqd_medium.mat', 'fredqd_large.mat'};
-for d = 1:3
+out_files = {'fredqd_small_3.mat', 'fredqd_small_4.mat', 'fredqd_small_5.mat', ...
+             'fredqd_medium.mat', 'fredqd_large.mat'};
+for d = 1:nDS
     out_path = fullfile(here, out_files{d});
     data   = Y{d};
     names  = Ynames{d};
@@ -180,57 +191,11 @@ for d = 1:3
 end
 
 %% ----- Plots ------------------------------------------------------------
+% Delegate to Functions/plot_dataset.m so layouts stay in one place.
 
-% Small (3 vars) -- 2x2 visual, panels same size via 2x4 underlying grid
-figure('Name','Small (3 vars)','Position',[100 100 900 600]);
-tiledlayout(2, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
-nexttile([1 2]);                  % var 1: row 1, cols 1-2
-plot(Ydates, Y{1}(:,1), 'r', 'LineWidth', 1.2);
-title(Ynames{1}{1}, 'Interpreter','none');
-xtickangle(45);
-try recessionplot; end %#ok<TRYNC>
-nexttile([1 2]);                  % var 2: row 1, cols 3-4
-plot(Ydates, Y{1}(:,2), 'r', 'LineWidth', 1.2);
-title(Ynames{1}{2}, 'Interpreter','none');
-xtickangle(45);
-try recessionplot; end %#ok<TRYNC>
-nexttile(6, [1 2]);               % var 3: row 2, cols 2-3 (centered)
-plot(Ydates, Y{1}(:,3), 'r', 'LineWidth', 1.2);
-title(Ynames{1}{3}, 'Interpreter','none');
-xtickangle(45);
-try recessionplot; end %#ok<TRYNC>
-
-% Medium (7 vars) -- 3x3, last row centered (var 7 in middle tile of row 3)
-figure('Name','Medium (7 vars)','Position',[100 100 1100 700]);
-tiledlayout(3, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
-for j = 1:6
-    nexttile;
-    plot(Ydates, Y{2}(:,j), 'r', 'LineWidth', 1.2);
-    title(Ynames{2}{j}, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
-end
-nexttile(8);       % var 7 centered: middle of row 3 (tiles 7,8,9 -> 8)
-plot(Ydates, Y{2}(:,7), 'r', 'LineWidth', 1.2);
-title(Ynames{2}{7}, 'Interpreter','none');
-xtickangle(45);
-try recessionplot; end %#ok<TRYNC>
-
-% Large (22 vars) -- 4x6, last row centered (vars 19-22 in cols 2-5)
-figure('Name','Large (22 vars)','Position',[50 50 1500 850]);
-tiledlayout(4, 6, 'TileSpacing', 'compact', 'Padding', 'compact');
-for j = 1:18
-    nexttile;
-    plot(Ydates, Y{3}(:,j), 'r', 'LineWidth', 1);
-    title(Ynames{3}{j}, 'FontSize', 8, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
-end
-% Row 4: 4 vars centered in tiles 20-23 (tiles 19 and 24 left empty)
-for k = 1:4
-    nexttile(19 + k);
-    plot(Ydates, Y{3}(:,18+k), 'r', 'LineWidth', 1);
-    title(Ynames{3}{18+k}, 'FontSize', 8, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
+if do_plot
+    addpath(fullfile(fileparts(here), 'Functions'));
+    for d = 1:nDS
+        plot_dataset(Y{d}, Ydates, Ynames{d});
+    end
 end

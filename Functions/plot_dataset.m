@@ -1,30 +1,47 @@
 function plot_dataset(Y, Ydates, Names)
 % PLOT_DATASET  One panel per variable, last (partial) row centered.
 %
-% All panels rendered at the same size. Small (N=3) uses a 2x4 underlying
-% grid where each panel spans 2 cols, so var 3 lands centered at cols 2-3
-% of row 2 with the same dimensions as vars 1 and 2.
+% All panels rendered at the same size. For cases where the natural
+% rows x cols grid would leave an odd-count last row, we use a
+% finer-resolution tiledlayout with each panel spanning multiple cols
+% so the last row sits visually centered without resizing panels.
 
 N = size(Y, 2);
 
+% ---- Small datasets with bespoke centered layouts ----
 if N == 3
     figure('Name','3 variables','Position',[100 100 900 600]);
     tiledlayout(2, 4, 'TileSpacing', 'compact', 'Padding', 'compact');
     nexttile([1 2]);                          % var 1: row 1, cols 1-2
-    plot(Ydates, Y(:,1), 'r', 'LineWidth', 1.2);
-    title(Names{1}, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
+    plot_one(Ydates, Y(:,1), Names{1});
     nexttile([1 2]);                          % var 2: row 1, cols 3-4
-    plot(Ydates, Y(:,2), 'r', 'LineWidth', 1.2);
-    title(Names{2}, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
+    plot_one(Ydates, Y(:,2), Names{2});
     nexttile(6, [1 2]);                       % var 3: row 2, cols 2-3 (centered)
-    plot(Ydates, Y(:,3), 'r', 'LineWidth', 1.2);
-    title(Names{3}, 'Interpreter','none');
-    xtickangle(45);
-    try recessionplot; end %#ok<TRYNC>
+    plot_one(Ydates, Y(:,3), Names{3});
+    return;
+end
+
+if N == 4
+    figure('Name','4 variables','Position',[100 100 1000 700]);
+    tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+    for j = 1:4
+        nexttile;
+        plot_one(Ydates, Y(:,j), Names{j});
+    end
+    return;
+end
+
+if N == 5
+    % 2x6 underlying grid; each panel spans 2 cols. Row 1: vars 1-3 in
+    % tiles 1-2 / 3-4 / 5-6. Row 2: vars 4-5 in tiles 8-9 / 10-11 (centered,
+    % skipping cols 1 and 6).
+    figure('Name','5 variables','Position',[100 100 1200 700]);
+    tiledlayout(2, 6, 'TileSpacing', 'compact', 'Padding', 'compact');
+    nexttile([1 2]);  plot_one(Ydates, Y(:,1), Names{1});
+    nexttile([1 2]);  plot_one(Ydates, Y(:,2), Names{2});
+    nexttile([1 2]);  plot_one(Ydates, Y(:,3), Names{3});
+    nexttile(8,  [1 2]);  plot_one(Ydates, Y(:,4), Names{4});
+    nexttile(10, [1 2]);  plot_one(Ydates, Y(:,5), Names{5});
     return;
 end
 
@@ -69,4 +86,11 @@ if last_row_n > 0
         try recessionplot; end %#ok<TRYNC>
     end
 end
+end
+
+function plot_one(Ydates, y, name)
+    plot(Ydates, y, 'r', 'LineWidth', 1.2);
+    title(name, 'Interpreter','none');
+    xtickangle(45);
+    try recessionplot; end %#ok<TRYNC>
 end
