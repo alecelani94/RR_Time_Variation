@@ -9,12 +9,12 @@ addpath(genpath(fullfile(pwd, 'Models')));
 
 %% ----- General settings -------------------------------------------------
 
-dataset    = 'small_3';             % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
+dataset    = 'small_5_gs5';             % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
 
 date_start = datetime(1959, 6, 1);  % inclusive; first available 1959-Q2
 date_end   = datetime(2019, 12, 1); % inclusive; pre Covid
 
-do_plot    = false;
+do_plot    = true;
 
 %% ----- VAR settings -----------------------------------------------------
 
@@ -22,6 +22,13 @@ P = 2;  % VAR lag order
 % R is swept: ranks 1..R_max are estimated, where R_max is the smallest R
 % such that the bilinear spec has at least as many TV parameters as the
 % unrestricted spec. R_max is computed from (N, P) after the data is loaded.
+
+% RR law-of-motion variant:
+%   '2RW'   - both A and B follow RW (symmetric; quadratic variance growth)
+%   'RWAR'  - one factor RW, the other AR(1) (linear variance growth)
+rr_variant = 'RWAR';     % '2RW' | 'RWAR'
+ar_factor  = 'A';        % 'A' | 'B'  -- which factor is AR(1) (used iff rr_variant = 'RWAR')
+rho_ar     = 0.99;       % AR(1) persistence (used iff rr_variant = 'RWAR')
 
 %% ----- MCMC settings ----------------------------------------------------
 
@@ -88,8 +95,18 @@ Phi_q_RR = cell(R_max, 1);
 
 for R = 1:R_max
 
-    fprintf('\n=== RR bilinear TVP-VAR (R = %d / %d) ===\n', R, R_max);
-    draws_r       = MCMC_RR_TVPVAR(Y, P, R, priors, opts);
+    fprintf('\n=== RR bilinear TVP-VAR (%s, R = %d / %d) ===\n', rr_variant, R, R_max);
+    switch upper(rr_variant)
+        case '2RW'
+            draws_r = MCMC_RR_2RW_TVPVAR(Y, P, R, priors, opts);
+        case 'RWAR'
+            priors.ar_factor = ar_factor;
+            priors.rho       = rho_ar;
+            draws_r = MCMC_RR_RWAR_TVPVAR(Y, P, R, priors, opts);
+        otherwise
+            error('main_fs:badVariant', ...
+                  'rr_variant must be ''2RW'' or ''RWAR'' (got ''%s'').', rr_variant);
+    end
     IFs_r         = compute_IFs(draws_r);
     IFs_r.Phi     = compute_RR_Phi_IFs(draws_r);
     Phi_q_r       = reconstruct_RR_quantiles(draws_r, qoi);
@@ -103,12 +120,15 @@ end
 %% ----- Save -------------------------------------------------------------
 
 if ~exist('Output', 'dir'); mkdir('Output'); end
-out_path = fullfile(pwd, 'Output', sprintf('%s.mat', dataset));
+% Filename includes the RR variant tag so 2RW and RWAR runs don't overwrite.
+out_path = fullfile(pwd, 'Output', ...
+    sprintf('%s_P%d_%s.mat', dataset, P, rr_variant));
 save(out_path, ...
-    'draws_TVP', 'IFs_TVP',  'Phi_q_TVP', ...
-    'draws_RR',  'IFs_RR',   'Phi_q_RR',  'R_max', ...
-    'qoi',       'levels', ...
-    'priors',    'opts',     'P', ...
-    'dataset',   'date_start', 'date_end', ...
+    'draws_TVP',  'IFs_TVP',  'Phi_q_TVP', ...
+    'draws_RR',   'IFs_RR',   'Phi_q_RR',  'R_max', ...
+    'qoi',        'levels', ...
+    'priors',     'opts',     'P', ...
+    'rr_variant', 'ar_factor', 'rho_ar', ...
+    'dataset',    'date_start', 'date_end', ...
     'Y',         'Names',     'Ydates');
 fprintf('\nSaved to: %s\n', out_path);

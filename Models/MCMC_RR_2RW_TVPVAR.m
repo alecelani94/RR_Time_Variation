@@ -1,5 +1,8 @@
-function draws = MCMC_RR_TVPVAR(Data, P, R, priors, opts)
-% MCMC_RR_TVPVAR   Gibbs sampler for the rank-R bilinear TVP-VAR(P).
+function draws = MCMC_RR_2RW_TVPVAR(Data, P, R, priors, opts)
+% MCMC_RR_2RW_TVPVAR   Gibbs sampler for the rank-R bilinear TVP-VAR(P)
+% with BOTH factors A_t and B_t following a Random Walk (symmetric "2RW"
+% specification). Sister sampler: MCMC_RR_RWAR_TVPVAR, which replaces one
+% factor's RW with an AR(1) to fix the quadratic variance growth.
 %
 % Model (non-centered, intercept folded in):
 %

@@ -19,11 +19,12 @@ addpath(genpath(fullfile(pwd, 'Functions')));
 
 %% ---- Selections -------------------------------------------------------
 
-dataset = 'small_3';   % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
-P_sel   = 1;           % lag order of the saved run to load
-R_sel   = 2;           % which RR rank to compare to TVP (1..R_max)
+dataset    = 'small_4_gs5';   % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
+P_sel      = 2;               % lag order of the saved run to load
+R_sel      = 2;               % which RR rank to compare to TVP (1..R_max)
+rr_variant = 'RWAR';          % '2RW' | 'RWAR' -- which saved run to load
 
-load(fullfile(pwd, 'Output', sprintf('%s_P%d.mat', dataset, P_sel)));
+load(fullfile(pwd, 'Output', sprintf('%s_P%d_%s.mat', dataset, P_sel, rr_variant)));
 
 if R_sel < 1 || R_sel > R_max
     error('eval_fs:badR', 'R_sel = %d outside valid range [1, %d].', R_sel, R_max);

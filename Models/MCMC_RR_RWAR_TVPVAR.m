@@ -1,24 +1,41 @@
-function draws = MCMC_RR_TVPVAR_v2(Data, P, R, priors, opts)
-% MCMC_RR_TVPVAR_v2  Gibbs sampler for the rank-R bilinear TVP-VAR(P) using
-% the b-block convention b_t = vec(B_t) (standard column-major), as in the
-% formulation suggested by Gemini.
+function draws = MCMC_RR_RWAR_TVPVAR(Data, P, R, priors, opts)
+% MCMC_RR_RWAR_TVPVAR   Gibbs sampler for the rank-R bilinear TVP-VAR(P)
+% with ONE factor RW and the OTHER an AR(1). Fixes the quadratic variance
+% growth of the 2RW spec; see Section "Matching the variance growth rate"
+% in the paper. Sister sampler: MCMC_RR_2RW_TVPVAR (symmetric RW x RW).
 %
-% Algebraically equivalent to MCMC_RR_TVPVAR (v1): both samplers target the
-% same posterior over (Psi_bar, A_t, B_t, S_l_m, Sigma, lambdas) and should
-% produce identical posterior summaries (to MCMC error). The only
-% difference is the internal ordering of the b_t vector and the
-% corresponding column ordering of the Z_b design matrix:
+% Model (non-centered, intercept folded in):
 %
-%     v1 (MCMC_RR_TVPVAR):  b_t := vec(B_t')  -- r innermost within (k, r)
-%                            ==> vec(A_t B_t') = (I_K kron A_t) b_t
-%     v2 (this file):       b_t := vec(B_t)   -- k innermost within (k, r)
-%                            ==> vec(A_t B_t') = (I_K kron A_t) K_{K,R} b_t
-%                                where K_{K,R} is the commutation matrix
-%                                (implemented here implicitly via column
-%                                permutation of Z_b -- no explicit K_{K,R}).
+%   y_t = X_t * phi_bar + X_t * S_l * vec(A_t * B_t') + eps_t,
 %
-% Use this file as a sanity check for the v1 benchmark. At R = 1 the two
-% are bit-for-bit identical; for R >= 2 they should agree to MC error.
+%   Factor chosen as AR(1) (via priors.ar_factor in {'A','B'}):
+%      AR(1) factor:  x_t = rho * x_{t-1} + u_t, u_t ~ N(0, v_AR)
+%      RW    factor:  x_t = x_{t-1}      + u_t, u_t ~ N(0, v_RW)
+%
+% Variance calibration (match-at-T, exact for any rho):
+%      v_RW = (R*T)^{-1/2}                                  (kept from the 2RW spec)
+%      v_AR = (1 - rho^2)/(1 - rho^(2T)) * sqrt(T/R)        (so Var of the AR(1)
+%                                                            at t=T equals the RW's)
+%
+% User-facing fields read from `priors`:
+%      priors.ar_factor : 'A' or 'B' (which factor is AR(1))
+%      priors.rho       : AR(1) persistence in (-1, 1); typical 0.99
+%
+% Sampler blocks (Gibbs, Chan 2023 JBES joint update + FS-Wagner sign flip):
+%   1. (phi_bar, S_l_m)          -- JOINT Gaussian conjugate (Chan 2023);
+%                                    same trick as MCMC_TVPVAR with
+%                                    tau_t := vec(A_t B_t') replacing theta_t.
+%   2. lambda_own, lambda_cross  -- hierarchical GIG (if priors.lam_hier).
+%   3. a                         -- banded precision (bandwidth NR).
+%   4. b                         -- banded precision (bandwidth KR).
+%   4.5 sign flip                -- jointly flip (A(:,:,r), B(:,:,r)) per rank
+%                                    component r with prob 1/2.
+%   5. Sigma                     -- inverse-Wishart (full matrix).
+%
+% Conditional-mean blocks (1, 3, 4) all sample Gaussians via banded or
+% block-tridiagonal Cholesky; the dominant cost is the (a, b) banded draws
+% with bandwidths NR and KR respectively, much smaller than the M=NK
+% bandwidth of the unrestricted MCMC_TVPVAR theta block (the point of RR).
 
 %% ---- setup ------------------------------------------------------------
 
@@ -61,7 +78,26 @@ priors.par_lam = [priors.sh_lam, priors.lam(2)/priors.sh_lam;     % own
 priors.Sigma_nu = N + priors.Sigma_nu_offset;
 priors.Sigma_S0 = (priors.Sigma_nu - N - 1) * priors.Sigma_AR;
 
-priors.v_ab = (R * T)^(-1/2);
+% --- Per-factor RW/AR(1) variance and persistence ---
+% Default both to RW; then override the chosen factor with AR(1).
+priors.rho_a = 1;
+priors.rho_b = 1;
+priors.v_a   = (R * T)^(-1/2);
+priors.v_b   = (R * T)^(-1/2);
+
+v_AR = (1 - priors.rho^2) / (1 - priors.rho^(2*T)) * sqrt(T / R);   % match-at-T
+switch upper(priors.ar_factor)
+    case 'A'
+        priors.rho_a = priors.rho;
+        priors.v_a   = v_AR;
+    case 'B'
+        priors.rho_b = priors.rho;
+        priors.v_b   = v_AR;
+    otherwise
+        error('MCMC_RR_RWAR_TVPVAR:badAR', ...
+              'priors.ar_factor must be ''A'' or ''B'' (got ''%s'').', ...
+              priors.ar_factor);
+end
 
 % Per-element prior variance of the matrix loading S_l_m (N x K).
 % Col 1 is the intercept loading, cols 2..K are lag loadings.
@@ -83,11 +119,13 @@ y_full = reshape(Y', N*T, 1);
 % Static block of the joint design has CONSTANT entries X(t,k); precompute.
 vv_Zs = reshape(repmat(X_broad, N, 1, 1), [], 1);    % N*K*T x 1
 
-% First-difference operators (fixed across iterations)
+% AR(1) / RW first-difference operators per factor (fixed across iterations).
+% Sub-diagonal entry is -1 for RW, -rho for AR(1).
 e1     = ones(T, 1);
-H_T    = spdiags([-e1, e1], [-1, 0], T, T);
-HtH_a  = (kron(H_T, speye(NR)))'  * kron(H_T, speye(NR));
-HtH_b  = (kron(H_T, speye(KR)))'  * kron(H_T, speye(KR));
+H_T_a  = spdiags([-priors.rho_a * e1, e1], [-1, 0], T, T);
+H_T_b  = spdiags([-priors.rho_b * e1, e1], [-1, 0], T, T);
+HtH_a  = (kron(H_T_a, speye(NR)))'  * kron(H_T_a, speye(NR));
+HtH_b  = (kron(H_T_b, speye(KR)))'  * kron(H_T_b, speye(KR));
 
 % Sparse-triplet (row, col) indices reused each iteration.
 % Convention: linearization (i, ..., t) with i innermost matches our 3D/4D
@@ -108,7 +146,7 @@ r_b      = mod(floor(idx_b / N),     R);
 k_b      = mod(floor(idx_b / (N*R)), K);
 t_b      = floor(idx_b / (N*R*K));
 ii_b_pre = t_b * N  + i_b + 1;
-jj_b_pre = t_b * KR + r_b * K + k_b + 1;   % v2: k innermost (matches vec(B_t))
+jj_b_pre = t_b * KR + k_b * R + r_b + 1;
 
 % --- Common (i, k, t) -> NT-stack / M-stack indices used by joint block ---
 idx_v    = (0:(N*K*T - 1))';
@@ -140,11 +178,10 @@ Sigma   = (E_ols' * E_ols) / (T - K);
 lambda_own   = priors.lam(2);
 lambda_cross = priors.lam(3);
 
-% TV factors A, B: simulate from the renormalized RW prior.
-% Used to seed AB_3D in the very first joint draw.
-sigma_ab = sqrt(priors.v_ab);
-A = cumsum(sigma_ab * randn(T, N, R), 1);     % T x N x R
-B = cumsum(sigma_ab * randn(T, K, R), 1);     % T x K x R
+% TV factors A, B: simulate one path from each factor's prior.
+% filter(1, [1 -rho], u) generates the AR(1) (or RW when rho = 1) path.
+A = filter(1, [1, -priors.rho_a], sqrt(priors.v_a) * randn(T, N, R), [], 1);
+B = filter(1, [1, -priors.rho_b], sqrt(priors.v_b) * randn(T, K, R), [], 1);
 
 % S_l_m sampled jointly with Psi_bar in Block 1; no init needed.
 
@@ -225,7 +262,7 @@ for iter = 1:niter
     SXB_3D    = pagemtimes(SlX_pages, B_pages);          % N x R x T (B_pages reused)
     Z_a       = sparse(ii_a_pre, jj_a_pre, SXB_3D(:), N*T, NR*T);
 
-    P_a    = (1/priors.v_ab) * HtH_a + Z_a' * Sigma_inv_T * Z_a;
+    P_a    = (1/priors.v_a) * HtH_a + Z_a' * Sigma_inv_T * Z_a;
     rhs_a  = Z_a' * (Sigma_inv_T * y_bar_vec);
     a_draw = draw_precision(rhs_a, P_a);
     A      = permute(reshape(a_draw, N, R, T), [3 1 2]);  % T x N x R
@@ -237,21 +274,37 @@ for iter = 1:niter
     vv_b = reshape(A_4D .* S_4D .* X_4D, [], 1);          % N*R*K*T x 1
     Z_b  = sparse(ii_b_pre, jj_b_pre, vv_b, N*T, KR*T);
 
-    P_b    = (1/priors.v_ab) * HtH_b + Z_b' * Sigma_inv_T * Z_b;
+    P_b    = (1/priors.v_b) * HtH_b + Z_b' * Sigma_inv_T * Z_b;
     rhs_b  = Z_b' * (Sigma_inv_T * y_bar_vec);
     b_draw = draw_precision(rhs_b, P_b);
-    % v2: jj_b_pre orders (k, r) with k innermost (= vec(B_t)), so the
-    % matching column-major reshape is (K, R, T); then permute to (T, K, R).
-    B      = permute(reshape(b_draw, K, R, T), [3 1 2]);  % T x K x R
+    % jj_b_pre orders (k, r) with r innermost (= vec(B_t')), so the
+    % matching column-major reshape is (R, K, T); then permute to (T, K, R).
+    % Equivalent to (K, R, T) + [3 1 2] only when R = 1 -- the previous
+    % version had a latent bug for R >= 2.
+    B      = permute(reshape(b_draw, R, K, T), [3 2 1]);  % T x K x R
 
-    %% Sign flip (Fruhwirth-Schnatter & Wagner 2010) -------------------
-    % Per rank component r, jointly flip (A(:,:,r), B(:,:,r)) w.p. 1/2;
-    % A_t B_t' is invariant so the posterior is preserved.
+    %% Sign flips -- three independent posterior-preserving moves ------
+    % The bilinear model has N+K+R independent sign symmetries; we apply
+    % one flip block for each to make S_l_m marginals symmetric (equal
+    % mass at +|S_l_m| and -|S_l_m|) and let the chain visit all
+    % 2^(N+K+R) equivalent sign basins.
+
+    % (a) Per-rank (Fruhwirth-Schnatter & Wagner 2010): flip (A_r, B_r).
     sgn_R = sign(rand(R, 1) - 0.5);
     for r = 1:R
         A(:, :, r) = sgn_R(r) * A(:, :, r);
         B(:, :, r) = sgn_R(r) * B(:, :, r);
     end
+
+    % (b) Per-equation: flip (S_l_m(i, :), A(:, i, :)) jointly w.p. 1/2.
+    sgn_N = sign(rand(N, 1) - 0.5);
+    S_l_m = sgn_N .* S_l_m;                          % flip row i of S_l_m
+    A     = A .* reshape(sgn_N, 1, N, 1);            % flip row i of A across t,r
+
+    % (c) Per-regressor: flip (S_l_m(:, k), B(:, k, :)) jointly w.p. 1/2.
+    sgn_K = sign(rand(K, 1) - 0.5);
+    S_l_m = S_l_m .* sgn_K(:)';                      % flip col k of S_l_m
+    B     = B .* reshape(sgn_K, 1, K, 1);            % flip row k of B across t,r
 
     %% Block 5: Sigma (inverse-Wishart, full matrix) -------------------
     % Recompute AB_3D with the latest (A, B); reuse y_bar_mat for residuals.
