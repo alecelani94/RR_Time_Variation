@@ -10,7 +10,7 @@ clc
 % saves one .mat per dataset. Set do_plot = true to also visualize them.
 % =========================================================================
 
-do_plot = truea;   % set true to draw one figure per dataset
+do_plot = true;    % set true to draw one figure per dataset
 
 %% ----- Load CSV (auto-pick latest, auto-detect delimiter) ---------------
 
