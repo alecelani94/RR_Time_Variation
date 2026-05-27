@@ -19,7 +19,7 @@ addpath(genpath(fullfile(pwd, 'Functions')));
 
 %% ---- Selections -------------------------------------------------------
 
-dataset    = 'small_4_gs5';   % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
+dataset    = 'small_5';   % 'small_3' | 'small_5' | 'medium_7' | 'medium_11' | 'large'
 P_sel      = 2;               % lag order of the saved run to load
 R_sel      = 2;               % which RR rank to compare to TVP (1..R_max)
 rr_variant = 'RWAR';          % '2RW' | 'RWAR' -- which saved run to load

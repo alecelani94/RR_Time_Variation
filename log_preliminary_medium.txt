@@ -1,0 +1,6 @@
+Dataset:   medium (7 variables)
+Sample:    01-Jun-1959 to 01-Dec-2019 (243 quarters)
+Variables: RGDP, PGDP, FedFunds, Cons, Inv, EmpHours, RealCompHour
+N = 7, P = 2, K = 15, M = 105, R_max (parsimony) = 4
+
+=== Unrestricted TVP-VAR ===

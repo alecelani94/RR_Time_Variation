@@ -43,15 +43,12 @@ small_3_vars = vars_block([
     ("FEDFUNDS",     "FedFunds",      "raw"),
 ])
 
-small_4_vars = small_3_vars + vars_block([
+small_5_vars = small_3_vars + vars_block([
     ("UNRATE",       "UnempRate",     "raw"),
-])
-
-small_5_vars = small_4_vars + vars_block([
     ("INDPRO",       "IPgrowth",      "4log"),
 ])
 
-medium_vars = vars_block([
+medium_7_vars = vars_block([
     ("GDPC1",        "RGDP",          "4log"),
     ("GDPCTPI",      "PGDP",          "4log"),
     ("FEDFUNDS",     "FedFunds",      "raw"),
@@ -59,6 +56,13 @@ medium_vars = vars_block([
     ("GPDIC1",       "Inv",           "4log"),
     ("HOANBS",       "EmpHours",      "4log"),
     ("COMPRNFB",     "RealCompHour",  "4log"),
+])
+
+medium_11_vars = medium_7_vars + vars_block([
+    ("INDPRO",       "IPgrowth",      "4log"),
+    ("UNRATE",       "UnempRate",     "raw"),
+    ("GS5",          "GS5",           "raw"),
+    ("OILPRICEx",    "OilInflation",  "4log"),
 ])
 
 large_vars = vars_block([
@@ -86,8 +90,8 @@ large_vars = vars_block([
     ("TWEXAFEGSMTHx","ExRate",        "4log"),
 ])
 
-datasets = [small_3_vars, small_4_vars, small_5_vars, medium_vars, large_vars]
-dsnames = ["Small_3", "Small_4", "Small_5", "Medium", "Large"]
+datasets = [small_3_vars, small_5_vars, medium_7_vars, medium_11_vars, large_vars]
+dsnames = ["Small_3", "Small_5", "Medium_7", "Medium_11", "Large"]
 
 Y_list = []
 Ynames_list = []
@@ -123,10 +127,10 @@ dates_str = np.array(
 ).reshape(-1, 1)
 
 out_files = [
-    "fredqd_small_3.mat", "fredqd_small_4.mat", "fredqd_small_5.mat",
-    "fredqd_medium.mat", "fredqd_large.mat",
+    "fredqd_small_3.mat", "fredqd_small_5.mat",
+    "fredqd_medium_7.mat", "fredqd_medium_11.mat", "fredqd_large.mat",
 ]
-sizes = [3, 4, 5, 7, 22]
+sizes = [3, 5, 7, 11, 22]
 for d, (fname, sz) in enumerate(zip(out_files, sizes)):
     names_cell = np.empty((1, len(Ynames_list[d])), dtype=object)
     for j, lbl in enumerate(Ynames_list[d]):

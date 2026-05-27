@@ -9,7 +9,7 @@ addpath(genpath(fullfile(pwd, 'Models')));
 
 %% ----- General settings -------------------------------------------------
 
-dataset    = 'small_5_gs5';             % 'small_3' | 'small_4' | 'small_5' | 'medium' | 'large'
+dataset    = 'small_5';             % 'small_3' | 'small_5' | 'medium_7' | 'medium_11' | 'large'
 
 date_start = datetime(1959, 6, 1);  % inclusive; first available 1959-Q2
 date_end   = datetime(2019, 12, 1); % inclusive; pre Covid

@@ -30,7 +30,7 @@ addpath(this_dir);
 
 %% ---- settings (mirror main_fs.m so the posterior is the same) ---------
 
-dataset    = 'small_5_gs5';
+dataset    = 'small_5';
 date_start = datetime(1959, 6, 1);
 date_end   = datetime(2019, 12, 1);
 

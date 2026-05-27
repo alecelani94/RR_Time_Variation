@@ -15,7 +15,7 @@
 % real run. This is purely a structural / dimensional / no-crash check
 % to flush out indexing bugs before committing to a full job.
 %
-% Requires: Data/fredqd_small_5_gs5.mat (or set DATASET below).
+% Requires: Data/fredqd_small_5.mat (or set DATASET below).
 
 clear; clc; close all;
 rng(12345);  % distinct from main_fs.m to catch seed-dependent bugs
@@ -25,7 +25,7 @@ addpath(genpath(fullfile(pwd, 'Models')));
 
 %% ---- settings ---------------------------------------------------------
 
-DATASET    = 'small_5_gs5';
+DATASET    = 'small_5';
 date_start = datetime(1959, 6, 1);
 date_end   = datetime(2019, 12, 1);
 
