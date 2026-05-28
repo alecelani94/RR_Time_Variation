@@ -13,9 +13,10 @@ codegen/
 *.xls
 *.mat
 
-# Output
+# Output (large MCMC outputs blocked; small posterior-median summaries whitelisted)
 Output/*
 !Output/.gitkeep
+!Output/*_preliminary.mat
 
 # OS
 Thumbs.db
