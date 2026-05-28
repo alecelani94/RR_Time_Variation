@@ -38,7 +38,7 @@ P = 4;
 opts.burn       = 5e3;
 opts.mcmc       = 1e4;
 opts.thin       = 1;
-opts.print_freq = 5e3;
+opts.print_freq = 5e2;
 
 %% ----- Load and slice by time span --------------------------------------
 
