@@ -97,7 +97,7 @@ max_R = max(N_all(idx));
 figure('Name', sprintf('Rank diagnostic across datasets (P=%d)', P_sel), ...
        'Position', [50 50 1300 480]);
 
-y_lim = [0.475 1.025];
+y_lim = [-0.025 1.025];
 
 % --- Panel (ii) ---
 subplot(1, 2, 1);
